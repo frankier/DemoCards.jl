@@ -193,7 +193,6 @@ function makedemos(source::String, templates::Union{Dict, Nothing} = nothing;
                     project_root = root,
                     src = src,
                     credit = credit,
-                    nbviewer_root_url = get_nbviewer_root_url(branch),
                     throw_error=throw_error)
         isnothing(templates) || save_cover(joinpath(absolute_root, "covers"), page)
         isnothing(templates) || generate(joinpath(absolute_root, "index.md"), page, templates)
@@ -509,41 +508,4 @@ function get_build_file(source_file, source, build)
         build_file = joinpath(build_dir, card * ".html")
     end
     return build_file
-end
-
-# modified from https://github.com/fredrikekre/Literate.jl to replace the use of @__NBVIEWER_ROOT_URL__
-function get_nbviewer_root_url(branch)
-    if haskey(ENV, "HAS_JOSH_K_SEAL_OF_APPROVAL") # Travis CI
-        repo_slug = get(ENV, "TRAVIS_REPO_SLUG", "unknown-repository")
-        deploy_folder = if get(ENV, "TRAVIS_PULL_REQUEST", nothing) == "false"
-            tag = ENV["TRAVIS_TAG"]
-            isempty(tag) ? "dev" : tag
-        else
-            "previews/PR$(get(ENV, "TRAVIS_PULL_REQUEST", "##"))"
-        end
-        return "https://nbviewer.jupyter.org/github/$(repo_slug)/blob/$(branch)/$(deploy_folder)"
-    elseif haskey(ENV, "GITHUB_ACTIONS")
-        repo_slug = get(ENV, "GITHUB_REPOSITORY", "unknown-repository")
-        deploy_folder = if get(ENV, "GITHUB_EVENT_NAME", nothing) == "push"
-            if (m = match(r"^refs\/tags\/(.*)$", get(ENV, "GITHUB_REF", ""))) !== nothing
-                String(m.captures[1])
-            else
-                "dev"
-            end
-        elseif (m = match(r"refs\/pull\/(\d+)\/merge", get(ENV, "GITHUB_REF", ""))) !== nothing
-            "previews/PR$(m.captures[1])"
-        else
-            "dev"
-        end
-        return "https://nbviewer.jupyter.org/github/$(repo_slug)/blob/$(branch)/$(deploy_folder)"
-    elseif haskey(ENV, "GITLAB_CI")
-        if (url = get(ENV, "CI_PROJECT_URL", nothing)) !== nothing
-            cfg["repo_root_url"] = "$(url)/blob/$(devbranch)"
-        end
-        if (url = get(ENV, "CI_PAGES_URL", nothing)) !== nothing &&
-           (m = match(r"https://(.+)", url)) !== nothing
-            return "https://nbviewer.jupyter.org/urls/$(m[1])"
-        end
-    end
-    return ""
 end

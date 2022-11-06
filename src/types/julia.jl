@@ -1,5 +1,6 @@
 const julia_exts = [".jl",]
 const nbviewer_badge = "https://img.shields.io/badge/show-nbviewer-579ACA.svg"
+const binder_badge = "https://img.shields.io/badge/run-binder-yellowgreen.svg"
 const download_badge = "https://img.shields.io/badge/download-julia-brightgreen.svg"
 const julia_footer = raw"""
 
@@ -119,8 +120,7 @@ end
     save_democards(card_dir::String, card::JuliaDemoCard;
                    project_dir,
                    src,
-                   credit,
-                   nbviewer_root_url)
+                   credit)
 
 process the original julia file and save it.
 
@@ -134,7 +134,6 @@ The processing pipeline is:
 function save_democards(card_dir::String,
                         card::JuliaDemoCard;
                         credit,
-                        nbviewer_root_url,
                         project_dir=Base.source_dir(),
                         src="src",
                         throw_error = false,
@@ -213,7 +212,6 @@ function save_democards(card_dir::String,
     badges = make_badges(card;
                          src=src,
                          card_dir=card_dir,
-                         nbviewer_root_url=nbviewer_root_url,
                          project_dir=project_dir,
                          build_notebook=card.notebook) 
     write(src_path, badges * "\n\n", body)
@@ -249,20 +247,27 @@ function save_democards(card_dir::String,
     end
 end
 
-function make_badges(card::JuliaDemoCard; src, card_dir, nbviewer_root_url, project_dir, build_notebook)
+function make_badges(card::JuliaDemoCard; src, card_dir, project_dir, build_notebook)
     cardname = splitext(basename(card.path))[1]
     badges = ["#md #"]
     push!(badges, "[![Source code]($download_badge)]($(cardname).jl)")
+    cfg = Literate.create_configuration(src; user_config=Dict(), user_kwargs=Dict())
 
     if build_notebook
-        if !isempty(nbviewer_root_url)
+        card_path = replace(normpath(relpath(card_dir, "$project_dir/$src")), Base.Filesystem.path_separator=>'/') * "/$(cardname).ipynb"
+        if "nbviewer_root_url" in keys(cfg)
             # Note: this is only reachable in CI environment
-            nbviewer_folder = normpath(relpath(card_dir, "$project_dir/$src"))
-            nbviewer_url = replace("$(nbviewer_root_url)/$(nbviewer_folder)/$(cardname).ipynb", Base.Filesystem.path_separator=>'/')
+            nbviewer_url = "$(cfg["nbviewer_root_url"])/$(card_path)"
         else
             nbviewer_url = "$(cardname).ipynb"
         end
         push!(badges, "[![notebook]($nbviewer_badge)]($nbviewer_url)")
+        if "binder_root_url" in keys(cfg)
+            binder_url = "$(cfg["binder_root_url"])/$(card_path)"
+        else
+            binder_url = "$(cardname).ipynb"
+        end
+        push!(badges, "[![notebook]($binder_badge)]($binder_url)")
     end
     if card.julia != JULIA_COMPAT
         # It might be over verbose to insert a compat badge for every julia card, only add one for
